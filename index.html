@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b1014" />
+<meta name="description" content="পৃথিবীর দেশের বিখ্যাত ও সুন্দর জায়গার ছবি দেখুন" />
+<link rel="manifest" href="manifest.json" />
+<title>World Explorer - বিখ্যাত জায়গা</title>
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; background: #0b1014; color: #f2ecdf; font-family: -apple-system, "Segoe UI", Roboto, "Noto Sans Bengali", sans-serif; }
+.header { position: sticky; top: 0; z-index: 20; background: rgba(11,16,20,0.92); border-bottom: 1px solid #2a342f; padding: 16px; }
+.header h1 { font-size: 22px; margin: 0; font-family: Georgia, "Noto Serif Bengali", serif; }
+.accent { color: #c9a14a; }
+.subtitle { font-size: 13px; color: #9aa39a; margin: 6px 0 0; }
+.search { margin-top: 12px; width: 100%; padding: 10px 14px; background: #141b1a; border: 1px solid #2a342f; border-radius: 8px; color: #f2ecdf; outline: none; font-size: 14px; }
+.search::placeholder { color: #5f6b62; }
+.main { max-width: 900px; margin: 0 auto; padding: 16px; }
+.count { font-size: 12px; color: #5f6b62; margin-bottom: 10px; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 600px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 800px) { .grid { grid-template-columns: repeat(4, 1fr); } }
+.card { text-align: left; border-radius: 8px; border: 1px solid #2a342f; background: #121815; color: #f2ecdf; padding: 12px; font-size: 14px; cursor: pointer; }
+.empty { text-align: center; color: #5f6b62; padding: 40px 0; grid-column: 1 / -1; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; padding: 12px; z-index: 30; }
+.modal { background: #0f1513; border: 1px solid #2a342f; border-radius: 12px; max-width: 640px; width: 100%; max-height: 88vh; overflow-y: auto; }
+.modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2a342f; }
+.modal-header h2 { margin: 0; font-size: 20px; }
+.close-btn { background: none; border: none; color: #9aa39a; font-size: 26px; cursor: pointer; line-height: 1; padding: 0 6px; }
+.modal-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.place { border-radius: 8px; overflow: hidden; border: 1px solid #2a342f; background: #0b1014; }
+.place-img-wrap { height: 200px; }
+.landmark-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.landmark-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center; padding: 0 12px; color: #fdf6e3; font-size: 14px; font-weight: 500; }
+.place-name { padding: 8px 12px; color: #c9a14a; font-size: 13px; font-weight: 500; }
+.footer { text-align: center; color: #5f6b62; font-size: 12px; padding: 24px 0; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const COUNTRIES = [
+  ["বাংলাদেশ", ["Sundarbans", "Cox's Bazar", "Lalbagh Fort"]],
+  ["ভারত", ["Taj Mahal", "Red Fort Delhi", "Hawa Mahal"]],
+  ["পাকিস্তান", ["Badshahi Mosque", "K2 (mountain)", "Lahore Fort"]],
+  ["নেপাল", ["Mount Everest", "Pashupatinath Temple", "Boudhanath"]],
+  ["ভুটান", ["Paro Taktsang", "Punakha Dzong", "Tiger's Nest"]],
+  ["শ্রীলঙ্কা", ["Sigiriya", "Temple of the Tooth", "Galle Fort"]],
+  ["মালদ্বীপ", ["Malé", "Maldives atoll", "Hulhumalé"]],
+  ["চীন", ["Great Wall of China", "Forbidden City", "Terracotta Army"]],
+  ["জাপান", ["Mount Fuji", "Fushimi Inari-taisha", "Tokyo Tower"]],
+  ["দক্ষিণ কোরিয়া", ["Gyeongbokgung", "Bukchon Hanok Village", "Jeju Island"]],
+  ["উত্তর কোরিয়া", ["Kumsusan Palace", "Juche Tower", "Mount Paektu"]],
+  ["মঙ্গোলিয়া", ["Gobi Desert", "Genghis Khan Statue Complex", "Erdene Zuu Monastery"]],
+  ["ভিয়েতনাম", ["Ha Long Bay", "Hoi An", "Cu Chi tunnels"]],
+  ["থাইল্যান্ড", ["Grand Palace Bangkok", "Wat Arun", "Phi Phi Islands"]],
+  ["মিয়ানমার", ["Shwedagon Pagoda", "Bagan", "Inle Lake"]],
+  ["লাওস", ["Luang Prabang", "Plain of Jars", "Wat Phou"]],
+  ["কম্বোডিয়া", ["Angkor Wat", "Bayon", "Phnom Penh Royal Palace"]],
+  ["মালয়েশিয়া", ["Petronas Towers", "Batu Caves", "Langkawi"]],
+  ["সিঙ্গাপুর", ["Marina Bay Sands", "Gardens by the Bay", "Sentosa Island"]],
+  ["ইন্দোনেশিয়া", ["Borobudur", "Mount Bromo", "Bali"]],
+  ["ফিলিপাইন", ["Banaue Rice Terraces", "Boracay", "Chocolate Hills"]],
+  ["ব্রুনাই", ["Sultan Omar Ali Saifuddien Mosque", "Kampong Ayer", "Ulu Temburong National Park"]],
+  ["তিমুর-লেস্তে", ["Cristo Rei of Dili", "Dili", "Atauro Island"]],
+  ["আফগানিস্তান", ["Bamiyan Buddhas site", "Band-e-Amir National Park", "Blue Mosque Mazar-i-Sharif"]],
+  ["ইরান", ["Persepolis", "Naqsh-e Jahan Square", "Shah Mosque"]],
+  ["ইরাক", ["Ziggurat of Ur", "Babylon", "Al-Mustansiriya Madrasah"]],
+  ["সিরিয়া", ["Krak des Chevaliers", "Palmyra", "Umayyad Mosque"]],
+  ["লেবানন", ["Baalbek", "Jeita Grotto", "Beirut Corniche"]],
+  ["জর্ডান", ["Petra", "Wadi Rum", "Jerash"]],
+  ["ইসরায়েল", ["Western Wall", "Dome of the Rock", "Dead Sea"]],
+  ["ফিলিস্তিন", ["Church of the Nativity", "Old City of Hebron", "Dead Sea Palestine"]],
+  ["সৌদি আরব", ["Masjid al-Haram", "Al-Ula", "Madain Saleh"]],
+  ["ইয়েমেন", ["Old City of Sana'a", "Socotra", "Shibam"]],
+  ["ওমান", ["Sultan Qaboos Grand Mosque", "Wahiba Sands", "Nizwa Fort"]],
+  ["সংযুক্ত আরব আমিরাত", ["Burj Khalifa", "Sheikh Zayed Grand Mosque", "Palm Jumeirah"]],
+  ["কাতার", ["Museum of Islamic Art Doha", "The Pearl-Qatar", "Souq Waqif"]],
+  ["বাহরাইন", ["Bahrain Fort", "Al Fateh Grand Mosque", "Tree of Life Bahrain"]],
+  ["কুয়েত", ["Kuwait Towers", "Grand Mosque Kuwait", "Failaka Island"]],
+  ["তুরস্ক", ["Hagia Sophia", "Cappadocia", "Pamukkale"]],
+  ["সাইপ্রাস", ["Kourion", "Tombs of the Kings Paphos", "Troodos Mountains"]],
+  ["জর্জিয়া", ["Tbilisi Old Town", "Svetitskhoveli Cathedral", "Gergeti Trinity Church"]],
+  ["আর্মেনিয়া", ["Geghard Monastery", "Tatev Monastery", "Lake Sevan"]],
+  ["আজারবাইজান", ["Flame Towers", "Old City Baku", "Gobustan National Park"]],
+  ["কাজাখস্তান", ["Bayterek", "Charyn Canyon", "Khan Shatyr"]],
+  ["উজবেকিস্তান", ["Registan", "Bukhara", "Khiva"]],
+  ["তুর্কমেনিস্তান", ["Door to Hell", "Ashgabat", "Ancient Merv"]],
+  ["তাজিকিস্তান", ["Pamir Mountains", "Iskanderkul", "Hissar Fortress"]],
+  ["কিরগিজস্তান", ["Lake Issyk-Kul", "Ala Archa National Park", "Tash Rabat"]],
+  ["মিশর", ["Great Pyramid of Giza", "Sphinx", "Abu Simbel temples"]],
+  ["লিবিয়া", ["Leptis Magna", "Ghadames", "Sabratha"]],
+  ["তিউনিসিয়া", ["Amphitheatre of El Jem", "Carthage", "Sidi Bou Said"]],
+  ["আলজেরিয়া", ["Casbah of Algiers", "Tassili n'Ajjer", "Timgad"]],
+  ["মরক্কো", ["Chefchaouen", "Hassan II Mosque", "Sahara Desert Morocco"]],
+  ["সুদান", ["Pyramids of Meroë", "Jebel Barkal", "Sanganeb Marine National Park"]],
+  ["দক্ষিণ সুদান", ["Boma National Park", "Nimule National Park", "Juba"]],
+  ["ইথিওপিয়া", ["Lalibela", "Simien Mountains", "Lake Tana"]],
+  ["ইরিত্রিয়া", ["Asmara", "Dahlak Archipelago", "Keren"]],
+  ["জিবুতি", ["Lake Assal", "Day Forest National Park", "Tadjoura"]],
+  ["সোমালিয়া", ["Laas Geel", "Mogadishu", "Hargeisa"]],
+  ["কেনিয়া", ["Maasai Mara", "Mount Kenya", "Lamu Old Town"]],
+  ["উগান্ডা", ["Bwindi Impenetrable Forest", "Murchison Falls", "Lake Bunyonyi"]],
+  ["তানজানিয়া", ["Mount Kilimanjaro", "Serengeti National Park", "Zanzibar"]],
+  ["রুয়ান্ডা", ["Volcanoes National Park", "Lake Kivu", "Kigali Genocide Memorial"]],
+  ["বুরুন্ডি", ["Lake Tanganyika", "Rusizi National Park", "Gitega"]],
+  ["কঙ্গো গণতান্ত্রিক প্রজাতন্ত্র", ["Virunga National Park", "Congo River", "Nyiragongo Volcano"]],
+  ["কঙ্গো প্রজাতন্ত্র", ["Odzala-Kokoua National Park", "Brazzaville", "Conkouati-Douli National Park"]],
+  ["গ্যাবন", ["Loango National Park", "Akanda National Park", "Lopé National Park"]],
+  ["ক্যামেরুন", ["Waza National Park", "Mount Cameroon", "Foumban Royal Palace"]],
+  ["মধ্য আফ্রিকান প্রজাতন্ত্র", ["Manovo-Gounda St Floris", "Dzanga-Sangha", "Bangui"]],
+  ["চাদ", ["Lake Chad", "Zakouma National Park", "Ennedi Plateau"]],
+  ["নাইজার", ["Aïr Mountains", "W National Park", "Agadez"]],
+  ["নাইজেরিয়া", ["Zuma Rock", "Yankari National Park", "Olumo Rock"]],
+  ["বেনিন", ["Royal Palaces of Abomey", "Pendjari National Park", "Ganvié"]],
+  ["টোগো", ["Koutammakou", "Lomé", "Togoville"]],
+  ["ঘানা", ["Cape Coast Castle", "Kakum National Park", "Lake Volta"]],
+  ["আইভরি কোস্ট", ["Basilica of Our Lady of Peace", "Comoé National Park", "Grand-Bassam"]],
+  ["লাইবেরিয়া", ["Sapo National Park", "Monrovia", "Providence Island"]],
+  ["সিয়েরা লিওন", ["Tacugama Chimpanzee Sanctuary", "Freetown", "Banana Islands"]],
+  ["গিনি", ["Mount Nimba", "Fouta Djallon", "Îles de Los"]],
+  ["গিনি-বিসাউ", ["Bijagós Archipelago", "Bissau", "Orango Island"]],
+  ["গাম্বিয়া", ["Kunta Kinteh Island", "Abuko Nature Reserve", "Banjul"]],
+  ["সেনেগাল", ["Île de Gorée", "Lake Retba", "Djoudj National Bird Sanctuary"]],
+  ["মৌরিতানিয়া", ["Chinguetti", "Banc d'Arguin", "Nouakchott"]],
+  ["মালি", ["Timbuktu", "Great Mosque of Djenné", "Bandiagara Escarpment"]],
+  ["বুরকিনা ফাসো", ["Ruins of Loropéni", "Sindou Peaks", "Ouagadougou"]],
+  ["জাম্বিয়া", ["Victoria Falls Zambia", "South Luangwa National Park", "Lake Kariba"]],
+  ["জিম্বাবুয়ে", ["Great Zimbabwe", "Victoria Falls Zimbabwe", "Hwange National Park"]],
+  ["মোজাম্বিক", ["Bazaruto Archipelago", "Island of Mozambique", "Gorongosa National Park"]],
+  ["মালাউই", ["Lake Malawi", "Mount Mulanje", "Liwonde National Park"]],
+  ["অ্যাঙ্গোলা", ["Kalandula Falls", "Kissama National Park", "Tundavala"]],
+  ["নামিবিয়া", ["Namib Desert", "Etosha National Park", "Fish River Canyon"]],
+  ["বতসোয়ানা", ["Okavango Delta", "Chobe National Park", "Tsodilo Hills"]],
+  ["দক্ষিণ আফ্রিকা", ["Table Mountain", "Kruger National Park", "Cape of Good Hope"]],
+  ["এসওয়াতিনি", ["Mlilwane Wildlife Sanctuary", "Ezulwini Valley", "Hlane Royal National Park"]],
+  ["লেসোথো", ["Maletsunyane Falls", "Sani Pass", "Thaba Bosiu"]],
+  ["মাদাগাস্কার", ["Avenue of the Baobabs", "Tsingy de Bemaraha", "Andasibe-Mantadia National Park"]],
+  ["মরিশাস", ["Le Morne Brabant", "Black River Gorges National Park", "Chamarel"]],
+  ["সেশেলস", ["Anse Source d'Argent", "Vallée de Mai", "Aldabra Atoll"]],
+  ["কোমোরোস", ["Mount Karthala", "Moroni", "Mohéli Marine Park"]],
+  ["কেপ ভার্দে", ["Pico do Fogo", "Santa Maria Cape Verde", "Cidade Velha"]],
+  ["সাও তোমে ও প্রিন্সিপি", ["Pico Cão Grande", "Obo Natural Park", "São Tomé"]],
+  ["ইক্যুটোরিয়াল গিনি", ["Malabo", "Monte Alén National Park", "Pico Basile"]],
+  ["যুক্তরাজ্য", ["Big Ben", "Stonehenge", "Tower of London"]],
+  ["ফ্রান্স", ["Eiffel Tower", "Palace of Versailles", "Mont Saint-Michel"]],
+  ["জার্মানি", ["Neuschwanstein Castle", "Brandenburg Gate", "Cologne Cathedral"]],
+  ["ইতালি", ["Colosseum", "Leaning Tower of Pisa", "Venice canals"]],
+  ["স্পেন", ["Sagrada Família", "Alhambra", "Park Güell"]],
+  ["পর্তুগাল", ["Belém Tower", "Pena Palace", "Douro Valley"]],
+  ["নেদারল্যান্ডস", ["Keukenhof", "Anne Frank House", "Windmills Kinderdijk"]],
+  ["বেলজিয়াম", ["Grand Place Brussels", "Atomium", "Bruges canals"]],
+  ["সুইজারল্যান্ড", ["Matterhorn", "Chillon Castle", "Lake Lucerne"]],
+  ["অস্ট্রিয়া", ["Schönbrunn Palace", "Hallstatt", "Hofburg"]],
+  ["সুইডেন", ["Vasa Museum", "Stockholm Old Town", "Icehotel"]],
+  ["নরওয়ে", ["Geirangerfjord", "Trolltunga", "Lofoten"]],
+  ["ডেনমার্ক", ["Nyhavn", "Little Mermaid statue", "Kronborg Castle"]],
+  ["ফিনল্যান্ড", ["Suomenlinna", "Lapland Finland", "Helsinki Cathedral"]],
+  ["আইসল্যান্ড", ["Blue Lagoon Iceland", "Gullfoss", "Jökulsárlón"]],
+  ["আয়ারল্যান্ড", ["Cliffs of Moher", "Giant's Causeway", "Ring of Kerry"]],
+  ["পোল্যান্ড", ["Wawel Castle", "Wieliczka Salt Mine", "Malbork Castle"]],
+  ["চেক প্রজাতন্ত্র", ["Prague Castle", "Charles Bridge", "Český Krumlov"]],
+  ["স্লোভাকিয়া", ["Bratislava Castle", "Spiš Castle", "High Tatras"]],
+  ["হাঙ্গেরি", ["Hungarian Parliament Building", "Fisherman's Bastion", "Lake Balaton"]],
+  ["রোমানিয়া", ["Bran Castle", "Peleș Castle", "Transfăgărășan"]],
+  ["বুলগেরিয়া", ["Rila Monastery", "Plovdiv Old Town", "Belogradchik Rocks"]],
+  ["গ্রিস", ["Acropolis of Athens", "Santorini", "Meteora"]],
+  ["আলবেনিয়া", ["Berat", "Butrint", "Blue Eye Albania"]],
+  ["সার্বিয়া", ["Belgrade Fortress", "Studenica Monastery", "Đavolja Varoš"]],
+  ["ক্রোয়েশিয়া", ["Dubrovnik", "Plitvice Lakes", "Diocletian's Palace"]],
+  ["বসনিয়া ও হার্জেগোভিনা", ["Stari Most", "Sarajevo Old Town", "Kravice Falls"]],
+  ["মন্টিনিগ্রো", ["Kotor Old Town", "Durmitor National Park", "Our Lady of the Rocks"]],
+  ["উত্তর মেসিডোনিয়া", ["Lake Ohrid", "Skopje", "Matka Canyon"]],
+  ["কসোভো", ["Visoki Dečani", "Prizren", "Gračanica Monastery"]],
+  ["স্লোভেনিয়া", ["Lake Bled", "Postojna Cave", "Ljubljana Castle"]],
+  ["ইউক্রেন", ["Saint Sophia Cathedral Kyiv", "Lviv Old Town", "Chernobyl"]],
+  ["বেলারুশ", ["Mir Castle", "Białowieża Forest", "Nesvizh Castle"]],
+  ["মলদোভা", ["Orheiul Vechi", "Cricova winery", "Chișinău"]],
+  ["রাশিয়া", ["Red Square", "Saint Basil's Cathedral", "Hermitage Museum"]],
+  ["লিথুয়ানিয়া", ["Trakai Island Castle", "Hill of Crosses", "Vilnius Old Town"]],
+  ["লাটভিয়া", ["Riga Old Town", "Gauja National Park", "Rundāle Palace"]],
+  ["এস্তোনিয়া", ["Tallinn Old Town", "Lahemaa National Park", "Kuressaare Castle"]],
+  ["লুক্সেমবার্গ", ["Vianden Castle", "Luxembourg City old quarter", "Mullerthal"]],
+  ["মাল্টা", ["Valletta", "Blue Lagoon Comino", "Mdina"]],
+  ["মোনাকো", ["Monte Carlo Casino", "Prince's Palace of Monaco", "Monaco Cathedral"]],
+  ["আন্দোরা", ["Casa de la Vall", "Vallnord", "Santa Coloma church"]],
+  ["সান মারিনো", ["Three Towers of San Marino", "Basilica di San Marino", "Monte Titano"]],
+  ["লিচেনস্টাইন", ["Vaduz Castle", "Malbun", "Liechtenstein National Museum"]],
+  ["ভ্যাটিকান সিটি", ["St. Peter's Basilica", "Sistine Chapel", "Vatican Museums"]],
+  ["যুক্তরাষ্ট্র", ["Statue of Liberty", "Grand Canyon", "Golden Gate Bridge"]],
+  ["কানাডা", ["Niagara Falls", "Banff National Park", "CN Tower"]],
+  ["মেক্সিকো", ["Chichen Itza", "Teotihuacan", "Tulum"]],
+  ["গুয়াতেমালা", ["Tikal", "Lake Atitlán", "Antigua Guatemala"]],
+  ["বেলিজ", ["Great Blue Hole", "Caracol", "Ambergris Caye"]],
+  ["হন্ডুরাস", ["Copán", "Roatán", "Pico Bonito National Park"]],
+  ["এল সালভাদর", ["Joya de Cerén", "Santa Ana Volcano", "Tazumal"]],
+  ["নিকারাগুয়া", ["Ometepe Island", "Granada Nicaragua", "Masaya Volcano"]],
+  ["কোস্টা রিকা", ["Arenal Volcano", "Manuel Antonio National Park", "Monteverde Cloud Forest"]],
+  ["পানামা", ["Panama Canal", "Casco Viejo", "San Blas Islands"]],
+  ["কিউবা", ["Old Havana", "Viñales Valley", "Varadero Beach"]],
+  ["জ্যামাইকা", ["Dunn's River Falls", "Blue Mountains Jamaica", "Negril"]],
+  ["হাইতি", ["Citadelle Laferrière", "Sans-Souci Palace", "Jacmel"]],
+  ["ডোমিনিকান প্রজাতন্ত্র", ["Colonial Zone of Santo Domingo", "Punta Cana", "Pico Duarte"]],
+  ["বাহামা", ["Exuma", "Nassau", "Pink Sands Beach Harbour Island"]],
+  ["ত্রিনিদাদ ও টোবাগো", ["Pitch Lake", "Caroni Swamp", "Maracas Bay"]],
+  ["বার্বাডোস", ["Harrison's Cave", "Bridgetown", "Animal Flower Cave"]],
+  ["সেন্ট লুসিয়া", ["Pitons Saint Lucia", "Sulphur Springs Saint Lucia", "Marigot Bay"]],
+  ["গ্রেনাডা", ["Grand Anse Beach", "Annandale Falls", "Underwater Sculpture Park Grenada"]],
+  ["সেন্ট ভিনসেন্ট ও গ্রেনাডিনস", ["Tobago Cays", "La Soufrière Saint Vincent", "Bequia"]],
+  ["অ্যান্টিগুয়া ও বার্বুডা", ["Nelson's Dockyard", "Shirley Heights", "Devil's Bridge Antigua"]],
+  ["ডোমিনিকা", ["Boiling Lake", "Trafalgar Falls", "Morne Trois Pitons National Park"]],
+  ["সেন্ট কিটস ও নেভিস", ["Brimstone Hill Fortress", "Nevis Peak", "Frigate Bay"]],
+  ["ব্রাজিল", ["Christ the Redeemer", "Iguazu Falls", "Amazon Rainforest"]],
+  ["আর্জেন্টিনা", ["Perito Moreno Glacier", "Iguazu Falls Argentina", "Recoleta Cemetery"]],
+  ["চিলি", ["Easter Island", "Atacama Desert", "Torres del Paine"]],
+  ["পেরু", ["Machu Picchu", "Nazca Lines", "Rainbow Mountain Peru"]],
+  ["বলিভিয়া", ["Salar de Uyuni", "Lake Titicaca", "Tiwanaku"]],
+  ["ইকুয়েডর", ["Galápagos Islands", "Quito Old Town", "Cotopaxi"]],
+  ["কলম্বিয়া", ["Cartagena Old Town", "Cocora Valley", "Tatacoa Desert"]],
+  ["ভেনেজুয়েলা", ["Angel Falls", "Mount Roraima", "Los Roques Archipelago"]],
+  ["গায়ানা", ["Kaieteur Falls", "Georgetown Guyana", "Iwokrama Forest"]],
+  ["সুরিনাম", ["Central Suriname Nature Reserve", "Paramaribo", "Brownsberg Nature Park"]],
+  ["প্যারাগুয়ে", ["Jesuit Missions of La Santísima Trinidad", "Itaipu Dam", "Asunción"]],
+  ["উরুগুয়ে", ["Colonia del Sacramento", "Punta del Este", "Montevideo"]],
+  ["অস্ট্রেলিয়া", ["Sydney Opera House", "Great Barrier Reef", "Uluru"]],
+  ["নিউজিল্যান্ড", ["Milford Sound", "Hobbiton", "Tongariro National Park"]],
+  ["পাপুয়া নিউ গিনি", ["Mount Wilhelm", "Sepik River", "Kokoda Track"]],
+  ["ফিজি", ["Mamanuca Islands", "Sigatoka Sand Dunes", "Bouma National Heritage Park"]],
+  ["সলোমন দ্বীপপুঞ্জ", ["Guadalcanal", "Marovo Lagoon", "Honiara"]],
+  ["ভানুয়াতু", ["Mount Yasur", "Blue Lagoon Vanuatu", "Port Vila"]],
+  ["সামোয়া", ["To Sua Ocean Trench", "Apia", "Lalomanu Beach"]],
+  ["টোঙ্গা", ["Ha'amonga 'a Maui", "Mapu'a 'a Vaca Blowholes", "Nuku'alofa"]],
+  ["কিরিবাতি", ["Tarawa Atoll", "Phoenix Islands Protected Area", "Christmas Island Kiribati"]],
+  ["মাইক্রোনেশিয়া", ["Nan Madol", "Chuuk Lagoon", "Pohnpei"]],
+  ["মার্শাল দ্বীপপুঞ্জ", ["Bikini Atoll", "Majuro", "Arno Atoll"]],
+  ["পালাউ", ["Rock Islands Palau", "Jellyfish Lake", "Koror"]],
+  ["নাউরু", ["Buada Lagoon", "Command Ridge", "Anibare Bay"]],
+  ["টুভালু", ["Funafuti", "Funafuti Conservation Area", "Vaiaku"]],
+];
+function placeholderColor(seed) {
+  const colors = ["#1d4e4a", "#7a2e2e", "#2e3a6b", "#6b4f1d", "#3a5d2e", "#5d2e5d"];
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) % colors.length;
+  return colors[Math.abs(h) % colors.length];
+}
+
+function render() {
+  const root = document.getElementById("root");
+  const query = (window.__query || "").trim().toLowerCase();
+  const filtered = COUNTRIES.filter(function(c){ return !query || c[0].toLowerCase().indexOf(query) !== -1; });
+  const selected = window.__selected;
+
+  var html = ''
+    + '<div class="header">'
+    + '<h1>পৃথিবীর দেশ <span class="accent">· বিখ্যাত জায়গা</span></h1>'
+    + '<p class="subtitle">দেশের নামে ক্লিক করো — সেই দেশের ৩টি বিখ্যাত ও সুন্দর জায়গার ছবি দেখাবে।</p>'
+    + '<input class="search" id="searchBox" placeholder="দেশের নাম লিখে খুঁজুন…" value="' + query + '" />'
+    + '</div>'
+    + '<div class="main">'
+    + '<p class="count">' + filtered.length + ' টি দেশ</p>'
+    + '<div class="grid">';
+
+  if (filtered.length === 0) {
+    html += '<div class="empty">কোনো দেশ পাওয়া যায়নি।</div>';
+  } else {
+    filtered.forEach(function(c){
+      const idx = COUNTRIES.indexOf(c);
+      html += '<button class="card" onclick="openCountry(' + idx + ')">' + c[0] + '</button>';
+    });
+  }
+  html += '</div></div><div class="footer">মোট ' + COUNTRIES.length + ' টি দেশ</div>';
+
+  if (selected !== null && selected !== undefined) {
+    const c = COUNTRIES[selected];
+    html += '<div class="modal-overlay" onclick="closeModal(event)">'
+      + '<div class="modal" onclick="event.stopPropagation()">'
+      + '<div class="modal-header"><h2>' + c[0] + '</h2>'
+      + '<button class="close-btn" onclick="closeModal()">×</button></div>'
+      + '<div class="modal-body">'
+      + c[1].map(function(place){
+          const safeId = "img-" + place.replace(/[^a-zA-Z0-9]/g,'');
+          return '<div class="place"><div class="place-img-wrap" id="' + safeId + '">'
+            + '<div class="landmark-placeholder" style="background:' + placeholderColor(place) + '">লোড হচ্ছে…</div>'
+            + '</div><div class="place-name">' + place + '</div></div>';
+        }).join("")
+      + '</div></div></div>';
+  }
+
+  root.innerHTML = html;
+
+  const sb = document.getElementById("searchBox");
+  if (sb) {
+    sb.addEventListener("input", function(e) {
+      window.__query = e.target.value;
+      render();
+      const newSb = document.getElementById("searchBox");
+      if (newSb) {
+        newSb.focus();
+        newSb.setSelectionRange(newSb.value.length, newSb.value.length);
+      }
+    });
+  }
+
+  if (selected !== null && selected !== undefined) {
+    const c2 = COUNTRIES[selected];
+    c2[1].forEach(function(place){
+      const containerId = "img-" + place.replace(/[^a-zA-Z0-9]/g,'');
+      fetch("https://en.wikipedia.org/api/rest_v1/page/summary/" + encodeURIComponent(place.replace(/ /g, "_")))
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+        .then(function(data){
+          const url = (data.thumbnail && data.thumbnail.source) || (data.originalimage && data.originalimage.source);
+          const el = document.getElementById(containerId);
+          if (url && el) {
+            el.innerHTML = '<img class="landmark-img" src="' + url + '" alt="' + place + '" loading="lazy" />';
+          } else if (el) {
+            el.innerHTML = '<div class="landmark-placeholder" style="background:' + placeholderColor(place) + '">' + place + '</div>';
+          }
+        })
+        .catch(function(){
+          const el = document.getElementById(containerId);
+          if (el) el.innerHTML = '<div class="landmark-placeholder" style="background:' + placeholderColor(place) + '">' + place + '</div>';
+        });
+    });
+  }
+}
+
+function openCountry(idx) {
+  window.__selected = idx;
+  render();
+}
+function closeModal(e) {
+  window.__selected = null;
+  render();
+}
+
+window.__query = "";
+window.__selected = null;
+render();
+</script>
+</body>
+</html>
